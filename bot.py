@@ -242,6 +242,6 @@ with open('config.json') as f:
 loop = asyncio.get_event_loop()
 token = config.pop("telegram_token")
 bot = SteamBot(token=token, config=config, loop=loop)
-loop.create_task(bot.messageLoop())
+loop.create_task(bot.message_loop())
 print('Listening ...')
 loop.run_forever()
