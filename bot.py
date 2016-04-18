@@ -59,9 +59,12 @@ class SteamBot(telepot.async.Bot):
 
     async def get_content_from_url(self, url, resp_format=None):
         cache_key = 'cached-response-{}'.format(md5(url.encode('utf-8')).hexdigest())
-        cached_data = await self.redis_conn.get(cache_key)
-        if cached_data:
-            return cached_data
+        if resp_format:
+            cached_data = await self.redis_conn.get(cache_key)
+            if cached_data:
+                if resp_format == 'json':
+                    return json.loads(cached_data)
+                return cached_data
         with aiohttp.ClientSession(loop=self.loop) as client:
             resp = await client.get(url)
             assert resp.status == 200
@@ -72,7 +75,13 @@ class SteamBot(telepot.async.Bot):
             else:
                 result = await resp.content.read()
             resp.close()
-            await self.redis_conn.set(cache_key, result, self.cache_time)
+
+            if resp_format:
+                if resp_format == 'json':
+                    to_cache = json.dumps(result)
+                else:
+                    to_cache = result
+                self.loop.create_task(self.redis_conn.set(cache_key, to_cache, self.cache_time))
             return result
 
     async def get_search_results(self, term):
@@ -180,7 +189,7 @@ class SteamBot(telepot.async.Bot):
     async def on_inline_query(self, msg):
         async def compute_answer():
             query_id, from_id, query_string = telepot.glance(msg, flavor='inline_query')
-            print('inline query: {}'.format(query_string))
+            print('inline query: {} from_id: {}'.format(query_string, from_id))
             results = await self.get_search_results(query_string)
             articles = []
             for res in results:
