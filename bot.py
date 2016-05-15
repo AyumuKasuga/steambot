@@ -4,6 +4,7 @@ import asyncio
 import aiohttp
 import telepot
 import telepot.async
+from telepot.namedtuple import InlineKeyboardMarkup, InlineKeyboardButton
 import re
 from datetime import datetime
 import asyncio_redis
@@ -39,13 +40,20 @@ _{author}_
 """
 
 
+class User(object):
+
+    def __init__(self, chat_id):
+        pass
+
+
+
 class SteamBot(telepot.async.Bot):
 
     def __init__(self, *args, config=None, **kwargs):
         super(SteamBot, self).__init__(*args, **kwargs)
         self._answerer = telepot.async.helper.Answerer(self)
         self.config = config
-        self.cache_time = self.config.get('cache_time', 300)
+        self.cache_time = self.config.get('cache_time', 10)
         self.redis_conn = None
         self.loop.create_task(self.initialize_redis())
 
@@ -65,7 +73,7 @@ class SteamBot(telepot.async.Bot):
                 if resp_format == 'json':
                     return json.loads(cached_data)
                 return cached_data
-        with aiohttp.ClientSession(loop=self.loop) as client:
+        with aiohttp.ClientSession(loop=self.loop, headers={'Accept-Language:': 'ru'}) as client:
             resp = await client.get(url)
             assert resp.status == 200
             if resp_format == 'text':
@@ -90,6 +98,7 @@ class SteamBot(telepot.async.Bot):
         )
         content = self.get_content_from_url(search_url, resp_format='text')
         parser = SearchSuggestParser()
+        # print(await content)
         parser.feed(await content)
         return parser.result
 
@@ -156,8 +165,21 @@ class SteamBot(telepot.async.Bot):
             about_the_game=self.clean_html(appdetails['about_the_game'])[:500]
         )
 
+    async def on_callback_query(self, msg):
+        query_id, from_id, data = telepot.glance(msg, flavor='callback_query')
+        print('Callback query:', query_id, from_id, data)
+        self.route(from_id, data)
+
     async def game_search_answer(self, term, chat_id):
         msg = self.get_games_message(await self.get_search_results(term))
+        # inline_keyboard_list = []
+        # for game in await self.get_search_results(term):
+        #     inline_keyboard_list.append([InlineKeyboardButton(
+        #         text="{} {}".format(game['name'], game['price']),
+        #         callback_data=u'/app_{}'.format(game['appid'])
+        #     )])
+        #
+        # markup = InlineKeyboardMarkup(inline_keyboard=inline_keyboard_list)
         await self.sendMessage(chat_id, msg, parse_mode='markdown', disable_web_page_preview=True)
 
     async def game_card_answer(self, appid, chat_id):
@@ -186,6 +208,24 @@ class SteamBot(telepot.async.Bot):
             )
             loop.create_task(self.sendMessage(chat_id, msg, parse_mode='markdown'))
 
+    def get_user_key(self, user_id):
+        return 'user-{}'.format(user_id)
+
+    async def get_user(self, user_id):
+        return json.loads(await self.redis_conn.get(self.get_user_key(user_id)))
+
+    async def create_or_update_user(self, chat):
+        key = self.get_user_key(chat['id'])
+        user = await self.redis_conn.get(key)
+        if not user:
+            new_user = chat
+            default_parameters = {}
+            new_user.update(default_parameters)
+            new_user_serialized = json.dumps(new_user)
+            await self.redis_conn.set(key, new_user_serialized)
+        else:
+            pass #TODO: update
+
     async def on_inline_query(self, msg):
         async def compute_answer():
             query_id, from_id, query_string = telepot.glance(msg, flavor='inline_query')
@@ -213,25 +253,28 @@ class SteamBot(telepot.async.Bot):
         self.loop.create_task(self.sendChatAction(chat_id, 'typing'))
         self.loop.create_task(self.game_search_answer(term, chat_id))
 
+    def route(self, chat_id, command, args=None):
+        if command == '/search':
+            self.search_game(args, chat_id)
+        elif command.find('/app_') != -1:
+            appid = command.replace('/app_', '').strip()
+            self.loop.create_task(self.sendChatAction(chat_id, 'typing'))
+            self.loop.create_task(self.game_card_answer(appid, chat_id))
+        elif command.find('/scr_') != -1:
+            appid = command.replace('/scr_', '').strip()
+            self.loop.create_task(self.sendChatAction(chat_id, 'upload_photo'))
+            self.loop.create_task(self.screenshots_answer(appid, chat_id))
+        elif command.find('/news_') != -1:
+            appid = command.replace('/news_', '').strip()
+            self.loop.create_task(self.sendChatAction(chat_id, 'typing'))
+            self.loop.create_task(self.last_news_answer(appid, chat_id))
+
     async def on_chat_message(self, msg):
-        print(msg)
         content_type, chat_type, chat_id = telepot.glance(msg)
+        self.loop.create_task(self.create_or_update_user(msg.get('chat')))
         command, args = self.get_command(msg)
         if command:
-            if command == '/search':
-                self.search_game(args, chat_id)
-            elif command.find('/app_') != -1:
-                appid = command.replace('/app_', '').strip()
-                self.loop.create_task(self.sendChatAction(chat_id, 'typing'))
-                self.loop.create_task(self.game_card_answer(appid, chat_id))
-            elif command.find('/scr_') != -1:
-                appid = command.replace('/scr_', '').strip()
-                self.loop.create_task(self.sendChatAction(chat_id, 'upload_photo'))
-                self.loop.create_task(self.screenshots_answer(appid, chat_id))
-            elif command.find('/news_') != -1:
-                appid = command.replace('/news_', '').strip()
-                self.loop.create_task(self.sendChatAction(chat_id, 'typing'))
-                self.loop.create_task(self.last_news_answer(appid, chat_id))
+            self.route(chat_id, command, args)
         else:
             self.search_game(msg['text'], chat_id)
 
