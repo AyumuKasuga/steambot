@@ -4,7 +4,7 @@ import asyncio
 import aiohttp
 import telepot
 import telepot.async
-from telepot.namedtuple import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
+from telepot.namedtuple import ReplyKeyboardMarkup
 import re
 from datetime import datetime
 import asyncio_redis
@@ -12,45 +12,9 @@ from hashlib import md5
 import json
 
 from helpers import SearchSuggestParser
+from constants import GAME_CARD_TEMPLATE, NEWS_CARD_TEMPLATE, LANG, CC
+from botan import track
 
-
-GAME_CARD_TEMPLATE = """
-*{name} ({release_date})* [steam](https://store.steampowered.com/app/{appid}/)
-{metacritic}
-*platforms:* _{platforms}_
-*genres:* _{genres}_
-*publisher:* _{publishers}_
-*recommendations:* _{recommendations}_
-*price:* _{price}_
-_get {screenshotscount} screenshots:_ /scr\_{appid}
-_get last news:_ /news\_{appid}
-
-
-{about_the_game}
-"""
-
-NEWS_CARD_TEMPLATE = """
-*{title}* [read on site]({url})
-_{pub_date}_
-_{feedlabel}_
-
-{contents}
-
-_{author}_
-"""
-
-
-LANG = {
-    '\U0001f1fa\U0001f1f8': 'english',
-    '\U0001f1f7\U0001f1fa': 'russian',
-}
-
-CC = {
-    '\U0001f1fa\U0001f1f8': 'US',
-    '\U0001f1ec\U0001f1e7': 'GB',
-    '\U0001f1e9\U0001f1ea': 'DE',
-    '\U0001f1f7\U0001f1fa': 'RU',
-}
 
 class SteamBot(telepot.async.Bot):
 
@@ -80,7 +44,8 @@ class SteamBot(telepot.async.Bot):
                 return cached_data
         with aiohttp.ClientSession(loop=self.loop) as client:
             resp = await client.get(url)
-            assert resp.status == 200
+            if resp.status != 200:
+                return
             if resp_format == 'text':
                 result = await resp.text()
             elif resp_format == 'json':
@@ -240,7 +205,12 @@ class SteamBot(telepot.async.Bot):
             new_user_serialized = json.dumps({'info': new_user, 'settings': default_settings})
             await self.redis_conn.set(key, new_user_serialized)
         else:
-            pass #TODO: update
+            user = json.loads(user)
+            if chat != user['info']:
+                user['info'] = chat
+                await self.redis_conn.set(key, json.dumps(user))
+
+
 
     async def on_inline_query(self, msg):
         async def compute_answer():
@@ -353,6 +323,7 @@ class SteamBot(telepot.async.Bot):
     async def on_chat_message(self, msg):
         content_type, chat_type, chat_id = telepot.glance(msg)
         print(msg)
+        self.loop.create_task(track(self.config.get('botan_token'), chat_id, msg))
         await self.create_or_update_user(msg.get('chat'))
         command, args = self.get_command(msg)
         if command:
