@@ -10,7 +10,7 @@ class SearchSuggestParser(HTMLParser):
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
-        if tag == 'a'  and attrs.get('href'):
+        if tag == 'a' and attrs.get('href'):
             self.result.append({})
             self.result[-1]['appid'] = attrs.get('data-ds-appid')
             self.result[-1]['href'] = attrs['href']
@@ -22,6 +22,8 @@ class SearchSuggestParser(HTMLParser):
             self.result[-1]['price'] = u''
 
     def handle_data(self, data):
+        if len(self.result) == 0:
+            return
         if self.result[-1].get('name') == u'':
             self.result[-1]['name'] = data
         elif self.result[-1].get('price') == u'':

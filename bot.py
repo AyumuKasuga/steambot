@@ -4,7 +4,7 @@ import asyncio
 import aiohttp
 import telepot
 import telepot.async
-from telepot.namedtuple import InlineKeyboardMarkup, InlineKeyboardButton
+from telepot.namedtuple import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
 import re
 from datetime import datetime
 import asyncio_redis
@@ -40,12 +40,17 @@ _{author}_
 """
 
 
-class User(object):
+LANG = {
+    '\U0001f1fa\U0001f1f8': 'english',
+    '\U0001f1f7\U0001f1fa': 'russian',
+}
 
-    def __init__(self, chat_id):
-        pass
-
-
+CC = {
+    'USA': 'US',
+    'GB': 'GB',
+    'DE': 'DE',
+    'RUR': 'RU',
+}
 
 class SteamBot(telepot.async.Bot):
 
@@ -73,7 +78,7 @@ class SteamBot(telepot.async.Bot):
                 if resp_format == 'json':
                     return json.loads(cached_data)
                 return cached_data
-        with aiohttp.ClientSession(loop=self.loop, headers={'Accept-Language:': 'ru'}) as client:
+        with aiohttp.ClientSession(loop=self.loop, cookies={'Steam_Language': 'russian'}) as client:
             resp = await client.get(url)
             assert resp.status == 200
             if resp_format == 'text':
@@ -92,18 +97,23 @@ class SteamBot(telepot.async.Bot):
                 self.loop.create_task(self.redis_conn.set(cache_key, to_cache, self.cache_time))
             return result
 
-    async def get_search_results(self, term):
-        search_url = u'https://store.steampowered.com/search/suggest?term={term}&f=games&cc=RU&l=english'.format(
-            term=term
+    async def get_search_results(self, term, settings):
+        search_url = u'https://store.steampowered.com/search/suggest?term={}&f=games&l={}&cc={}'.format(
+            term,
+            settings.get('lang'),
+            settings.get('cc')
         )
         content = self.get_content_from_url(search_url, resp_format='text')
         parser = SearchSuggestParser()
-        # print(await content)
         parser.feed(await content)
         return parser.result
 
-    async def get_appdetails(self, appid):
-        url = u'https://store.steampowered.com/api/appdetails/?appids={}'.format(appid)
+    async def get_appdetails(self, appid, settings={}):
+        url = u'https://store.steampowered.com/api/appdetails/?appids={}&l={}&cc={}'.format(
+            appid,
+            settings.get('lang'),
+            settings.get('cc')
+        )
         content = await self.get_content_from_url(url, resp_format='json')
         return content[appid]['data'] if content else {}
 
@@ -171,19 +181,15 @@ class SteamBot(telepot.async.Bot):
         self.route(from_id, data)
 
     async def game_search_answer(self, term, chat_id):
-        msg = self.get_games_message(await self.get_search_results(term))
-        # inline_keyboard_list = []
-        # for game in await self.get_search_results(term):
-        #     inline_keyboard_list.append([InlineKeyboardButton(
-        #         text="{} {}".format(game['name'], game['price']),
-        #         callback_data=u'/app_{}'.format(game['appid'])
-        #     )])
-        #
-        # markup = InlineKeyboardMarkup(inline_keyboard=inline_keyboard_list)
+        user_info = await self.get_user(chat_id)
+        settings = user_info.get('settings')
+        msg = self.get_games_message(await self.get_search_results(term, settings))
         await self.sendMessage(chat_id, msg, parse_mode='markdown', disable_web_page_preview=True)
 
     async def game_card_answer(self, appid, chat_id):
-        app_details = await self.get_appdetails(appid)
+        user_info = await self.get_user(chat_id)
+        settings = user_info.get('settings')
+        app_details = await self.get_appdetails(appid, settings)
         await self.sendMessage(chat_id, self.get_game_card_message(app_details), parse_mode='markdown')
 
     async def send_photo_from_url(self, url, photo_name, chat_id):
@@ -211,6 +217,14 @@ class SteamBot(telepot.async.Bot):
     def get_user_key(self, user_id):
         return 'user-{}'.format(user_id)
 
+    async def save_user_settings(self, user_id, new_settings):
+        key = self.get_user_key(user_id)
+        user = await self.get_user(user_id)
+        settings = user.get('settings', {})
+        settings.update(new_settings)
+        user['settings'] = settings
+        await self.redis_conn.set(key, json.dumps(user))
+
     async def get_user(self, user_id):
         return json.loads(await self.redis_conn.get(self.get_user_key(user_id)))
 
@@ -219,9 +233,11 @@ class SteamBot(telepot.async.Bot):
         user = await self.redis_conn.get(key)
         if not user:
             new_user = chat
-            default_parameters = {}
-            new_user.update(default_parameters)
-            new_user_serialized = json.dumps(new_user)
+            default_settings = {
+                'lang': 'english',
+                'cc': 'US'
+            }
+            new_user_serialized = json.dumps({'info': new_user, 'settings': default_settings})
             await self.redis_conn.set(key, new_user_serialized)
         else:
             pass #TODO: update
@@ -230,7 +246,9 @@ class SteamBot(telepot.async.Bot):
         async def compute_answer():
             query_id, from_id, query_string = telepot.glance(msg, flavor='inline_query')
             print('inline query: {} from_id: {}'.format(query_string, from_id))
-            results = await self.get_search_results(query_string)
+            user_info = await self.get_user(from_id)
+            settings = user_info.get('settings')
+            results = await self.get_search_results(query_string, settings)
             articles = []
             for res in results:
                 articles.append({
@@ -242,16 +260,42 @@ class SteamBot(telepot.async.Bot):
                         res['price'],
                         res['href']
                     ),
-                    'url': res['href'],
+                    # 'url': res['href'],
                     'description': res['price'],
                     'thumb_url': res['image']
                 })
-            return articles
+            return {'results': articles, 'switch_pm_text': 'Back to Bot'}
         self._answerer.answer(msg, compute_answer)
+
+    async def on_chosen_inline_result(self, msg):
+        query_id, from_id, query_string = telepot.glance(msg, flavor='chosen_inline_result')
+        print('Chosen Inline Result: {} {} from_id: {}'.format(query_id, query_string, from_id))
+        self.loop.create_task(self.game_card_answer(query_id, from_id))
+
 
     def search_game(self, term, chat_id):
         self.loop.create_task(self.sendChatAction(chat_id, 'typing'))
         self.loop.create_task(self.game_search_answer(term, chat_id))
+
+    async def show_lang_keyboard(self, chat_id):
+        markup = ReplyKeyboardMarkup(keyboard=[
+            ['/lang {}'.format(x) for x in LANG.keys()],
+        ], one_time_keyboard=True)
+        self.loop.create_task(bot.sendMessage(chat_id, 'set language', reply_markup=markup))
+
+    async def set_lang(self, chat_id, lang):
+        await self.save_user_settings(chat_id, {'lang': LANG.get(lang)})
+        self.loop.create_task(bot.sendMessage(chat_id, 'language saved'))
+
+    async def show_cc_keyboard(self, chat_id):
+        markup = ReplyKeyboardMarkup(keyboard=[
+            ['/cc {}'.format(x) for x in CC.keys()],
+        ], one_time_keyboard=True)
+        self.loop.create_task(bot.sendMessage(chat_id, 'set region', reply_markup=markup))
+
+    async def set_cc(self, chat_id, cc):
+        await self.save_user_settings(chat_id, {'cc': CC.get(cc)})
+        self.loop.create_task(bot.sendMessage(chat_id, 'region saved'))
 
     def route(self, chat_id, command, args=None):
         if command == '/search':
@@ -268,10 +312,23 @@ class SteamBot(telepot.async.Bot):
             appid = command.replace('/news_', '').strip()
             self.loop.create_task(self.sendChatAction(chat_id, 'typing'))
             self.loop.create_task(self.last_news_answer(appid, chat_id))
+        elif command.find('/lang') != -1:
+            lang = args.strip() if args else None
+            if lang:
+                self.loop.create_task(self.set_lang(chat_id, lang))
+            else:
+                self.loop.create_task(self.show_lang_keyboard(chat_id))
+        elif command.find('/cc') != -1:
+            cc = args.strip() if args else None
+            if cc:
+                self.loop.create_task(self.set_cc(chat_id, cc))
+            else:
+                self.loop.create_task(self.show_cc_keyboard(chat_id))
 
     async def on_chat_message(self, msg):
         content_type, chat_type, chat_id = telepot.glance(msg)
-        self.loop.create_task(self.create_or_update_user(msg.get('chat')))
+        print(msg)
+        await self.create_or_update_user(msg.get('chat'))
         command, args = self.get_command(msg)
         if command:
             self.route(chat_id, command, args)
