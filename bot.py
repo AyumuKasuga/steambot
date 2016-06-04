@@ -312,10 +312,9 @@ class SteamBot(telepot.async.Bot):
             appid = command.replace('/news_', '').strip()
             self.loop.create_task(self.sendChatAction(chat_id, 'typing'))
             self.loop.create_task(self.last_news_answer(appid, chat_id))
-        elif command.find('/feedback ') != -1:
-            msg = command.replace('/feedback ', '').strip()
+        elif command.find('/feedback') != -1:
+            msg = args.replace('/feedback ', '').strip()
             if msg:
-                self.sendMessage(chat_id, msg)
                 self.loop.create_task(self.sendMessage(
                     3279632,
                     'feedback from: {}: {}'.format(chat_id, msg)
