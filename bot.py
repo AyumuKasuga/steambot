@@ -78,7 +78,7 @@ class SteamBot(telepot.async.Bot):
                 if resp_format == 'json':
                     return json.loads(cached_data)
                 return cached_data
-        with aiohttp.ClientSession(loop=self.loop, cookies={'Steam_Language': 'russian'}) as client:
+        with aiohttp.ClientSession(loop=self.loop) as client:
             resp = await client.get(url)
             assert resp.status == 200
             if resp_format == 'text':
