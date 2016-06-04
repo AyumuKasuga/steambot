@@ -46,10 +46,10 @@ LANG = {
 }
 
 CC = {
-    'USA': 'US',
-    'GB': 'GB',
-    'DE': 'DE',
-    'RUR': 'RU',
+    '\U0001f1fa\U0001f1f8': 'US',
+    '\U0001f1ec\U0001f1e7': 'GB',
+    '\U0001f1e9\U0001f1ea': 'DE',
+    '\U0001f1f7\U0001f1fa': 'RU',
 }
 
 class SteamBot(telepot.async.Bot):
@@ -279,7 +279,7 @@ class SteamBot(telepot.async.Bot):
 
     async def show_lang_keyboard(self, chat_id):
         markup = ReplyKeyboardMarkup(keyboard=[
-            ['/lang {}'.format(x) for x in LANG.keys()],
+            ['/lang {}'.format(x)] for x in LANG.keys()
         ], one_time_keyboard=True)
         self.loop.create_task(bot.sendMessage(chat_id, 'set language', reply_markup=markup))
 
@@ -289,7 +289,7 @@ class SteamBot(telepot.async.Bot):
 
     async def show_cc_keyboard(self, chat_id):
         markup = ReplyKeyboardMarkup(keyboard=[
-            ['/cc {}'.format(x) for x in CC.keys()],
+            ['/cc {}'.format(x)] for x in CC.keys()
         ], one_time_keyboard=True)
         self.loop.create_task(bot.sendMessage(chat_id, 'set region', reply_markup=markup))
 
@@ -312,6 +312,25 @@ class SteamBot(telepot.async.Bot):
             appid = command.replace('/news_', '').strip()
             self.loop.create_task(self.sendChatAction(chat_id, 'typing'))
             self.loop.create_task(self.last_news_answer(appid, chat_id))
+        elif command.find('/feedback ') != -1:
+            msg = command.replace('/feedback ', '').strip()
+            if msg:
+                self.sendMessage(chat_id, msg)
+                self.loop.create_task(self.sendMessage(
+                    3279632,
+                    'feedback from: {}: {}'.format(chat_id, msg)
+                ))
+                self.loop.create_task(self.sendMessage(chat_id, 'thank you for your feedback!'))
+            else:
+                self.loop.create_task(self.sendMessage(chat_id, 'looks like your feedback is empty!'))
+        elif command.find('/settings') != -1:
+            self.loop.create_task(
+                self.sendMessage(
+                    chat_id,
+                    "change region: /cc\n"
+                    "change language: /lang\n"
+                )
+            )
         elif command.find('/lang') != -1:
             lang = args.strip() if args else None
             if lang:
