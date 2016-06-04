@@ -342,6 +342,13 @@ class SteamBot(telepot.async.Bot):
                 self.loop.create_task(self.set_cc(chat_id, cc))
             else:
                 self.loop.create_task(self.show_cc_keyboard(chat_id))
+        elif command.find('/start') != -1:
+            self.loop.create_task(
+                self.sendMessage(
+                    chat_id,
+                    'Welcome! Just type / for view list of commands, also you can use this bot with inline mode'
+                )
+            )
 
     async def on_chat_message(self, msg):
         content_type, chat_type, chat_id = telepot.glance(msg)
