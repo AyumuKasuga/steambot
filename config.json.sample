@@ -6,5 +6,6 @@
         "port": 6379,
         "db": 0
     },
+    "admin_id": 3279632,
     "cache_time": 300
 }

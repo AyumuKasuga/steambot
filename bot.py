@@ -8,12 +8,11 @@ from telepot.namedtuple import ReplyKeyboardMarkup
 import re
 from datetime import datetime
 import asyncio_redis
-from hashlib import md5
 import json
 
-from helpers import SearchSuggestParser
-from constants import GAME_CARD_TEMPLATE, NEWS_CARD_TEMPLATE, LANG, CC
-from botan import track
+from .utils import SearchSuggestParser, cache_steam_response
+from .constants import GAME_CARD_TEMPLATE, NEWS_CARD_TEMPLATE, LANG, CC
+from .botan import track
 
 
 class SteamBot(telepot.async.Bot):
@@ -34,14 +33,8 @@ class SteamBot(telepot.async.Bot):
             poolsize=5
         )
 
+    @cache_steam_response
     async def get_content_from_url(self, url, resp_format=None):
-        cache_key = 'cached-response-{}'.format(md5(url.encode('utf-8')).hexdigest())
-        if resp_format:
-            cached_data = await self.redis_conn.get(cache_key)
-            if cached_data:
-                if resp_format == 'json':
-                    return json.loads(cached_data)
-                return cached_data
         with aiohttp.ClientSession(loop=self.loop) as client:
             resp = await client.get(url)
             if resp.status != 200:
@@ -53,13 +46,6 @@ class SteamBot(telepot.async.Bot):
             else:
                 result = await resp.content.read()
             resp.close()
-
-            if resp_format:
-                if resp_format == 'json':
-                    to_cache = json.dumps(result)
-                else:
-                    to_cache = result
-                self.loop.create_task(self.redis_conn.set(cache_key, to_cache, self.cache_time))
             return result
 
     async def get_search_results(self, term, settings):
@@ -285,7 +271,7 @@ class SteamBot(telepot.async.Bot):
             msg = args.replace('/feedback ', '').strip()
             if msg:
                 self.loop.create_task(self.sendMessage(
-                    3279632,
+                    self.config.get('admin_id'),
                     'feedback from: {}: {}'.format(chat_id, msg)
                 ))
                 self.loop.create_task(self.sendMessage(chat_id, 'thank you for your feedback!'))
@@ -315,16 +301,17 @@ class SteamBot(telepot.async.Bot):
             self.loop.create_task(
                 self.sendMessage(
                     chat_id,
-                    'Welcome! Just type / for view list of commands, also you can use this bot with inline mode'
+                    'Welcome! Just type / for view list of commands, also you can use this bot with inline mode.\n'
+                    'For search a game just send message with game title'
                 )
             )
 
     async def on_chat_message(self, msg):
         content_type, chat_type, chat_id = telepot.glance(msg)
         print(msg)
-        # botan_token = self.config.get('botan_token')
-        # if botan_token:
-        #     self.loop.create_task(track(botan_token, chat_id, msg, loop=self.loop))
+        botan_token = self.config.get('botan_token')
+        if botan_token:
+            self.loop.create_task(track(botan_token, chat_id, msg, loop=self.loop))
         await self.create_or_update_user(msg.get('chat'))
         command, args = self.get_command(msg)
         if not command:

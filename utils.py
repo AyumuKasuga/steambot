@@ -1,4 +1,6 @@
 # coding: utf-8
+import json
+from hashlib import md5
 from html.parser import HTMLParser
 
 
@@ -30,3 +32,25 @@ class SearchSuggestParser(HTMLParser):
             self.result[-1]['price'] = data
 
 
+def cache_steam_response(func):
+    async def wrapper(*args, **kwargs):
+        self, url, resp_format = args[0], args[1], kwargs['resp_format']
+        if resp_format is None:
+            return await func(*args, **kwargs)
+        cache_key = 'cached-response-{}'.format(md5(url.encode('utf-8')).hexdigest())
+        cached_data = await self.redis_conn.get(cache_key)
+        if cached_data:
+            if resp_format == 'json':
+                return json.loads(cached_data)
+            return cached_data
+        else:
+            result = await func(*args, **kwargs)
+            if result is None:
+                return
+            elif resp_format == 'json':
+                to_cache = json.dumps(result)
+            else:
+                to_cache = result
+            self.loop.create_task(self.redis_conn.set(cache_key, to_cache, self.cache_time))
+            return result
+    return wrapper
