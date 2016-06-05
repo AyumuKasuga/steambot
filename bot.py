@@ -242,7 +242,6 @@ class SteamBot(telepot.async.Bot):
         print('Chosen Inline Result: {} {} from_id: {}'.format(query_id, query_string, from_id))
         self.loop.create_task(self.game_card_answer(query_id, from_id))
 
-
     def search_game(self, term, chat_id):
         self.loop.create_task(self.sendChatAction(chat_id, 'typing'))
         self.loop.create_task(self.game_search_answer(term, chat_id))
@@ -323,13 +322,14 @@ class SteamBot(telepot.async.Bot):
     async def on_chat_message(self, msg):
         content_type, chat_type, chat_id = telepot.glance(msg)
         print(msg)
-        self.loop.create_task(track(self.config.get('botan_token'), chat_id, msg))
+        # botan_token = self.config.get('botan_token')
+        # if botan_token:
+        #     self.loop.create_task(track(botan_token, chat_id, msg, loop=self.loop))
         await self.create_or_update_user(msg.get('chat'))
         command, args = self.get_command(msg)
-        if command:
-            self.route(chat_id, command, args)
-        else:
-            self.search_game(msg['text'], chat_id)
+        if not command:
+            command, args = '/search', msg['text']
+        self.route(chat_id, command, args)
 
 
 with open('config.json') as f:

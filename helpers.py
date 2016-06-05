@@ -28,3 +28,5 @@ class SearchSuggestParser(HTMLParser):
             self.result[-1]['name'] = data
         elif self.result[-1].get('price') == u'':
             self.result[-1]['price'] = data
+
+
