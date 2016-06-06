@@ -54,3 +54,5 @@ def cache_steam_response(func):
             self.loop.create_task(self.redis_conn.set(cache_key, to_cache, self.cache_time))
             return result
     return wrapper
+
+group = lambda flat, size: [flat[i:i+size] for i in range(0, len(flat), size)]

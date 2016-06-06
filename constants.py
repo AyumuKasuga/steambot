@@ -27,6 +27,7 @@ _{author}_
 LANG = {
     '\U0001f1fa\U0001f1f8': 'english',
     '\U0001f1f7\U0001f1fa': 'russian',
+    '\U0001f1ee\U0001f1f9': 'italian'
 }
 
 CC = {
@@ -34,4 +35,5 @@ CC = {
     '\U0001f1ec\U0001f1e7': 'GB',
     '\U0001f1e9\U0001f1ea': 'DE',
     '\U0001f1f7\U0001f1fa': 'RU',
+    '\U0001f1ee\U0001f1f9': 'IT',
 }

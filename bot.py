@@ -10,9 +10,9 @@ from datetime import datetime
 import asyncio_redis
 import json
 
-from .utils import SearchSuggestParser, cache_steam_response
-from .constants import GAME_CARD_TEMPLATE, NEWS_CARD_TEMPLATE, LANG, CC
-from .botan import track
+from utils import SearchSuggestParser, cache_steam_response, group
+from constants import GAME_CARD_TEMPLATE, NEWS_CARD_TEMPLATE, LANG, CC
+from botan import track
 
 
 class SteamBot(telepot.async.Bot):
@@ -233,9 +233,7 @@ class SteamBot(telepot.async.Bot):
         self.loop.create_task(self.game_search_answer(term, chat_id))
 
     async def show_lang_keyboard(self, chat_id):
-        markup = ReplyKeyboardMarkup(keyboard=[
-            ['/lang {}'.format(x)] for x in LANG.keys()
-        ], one_time_keyboard=True)
+        markup = ReplyKeyboardMarkup(keyboard=group(list(LANG.keys()), 3), one_time_keyboard=True)
         self.loop.create_task(bot.sendMessage(chat_id, 'set language', reply_markup=markup))
 
     async def set_lang(self, chat_id, lang):
@@ -243,9 +241,7 @@ class SteamBot(telepot.async.Bot):
         self.loop.create_task(bot.sendMessage(chat_id, 'language saved'))
 
     async def show_cc_keyboard(self, chat_id):
-        markup = ReplyKeyboardMarkup(keyboard=[
-            ['/cc {}'.format(x)] for x in CC.keys()
-        ], one_time_keyboard=True)
+        markup = ReplyKeyboardMarkup(keyboard=group(list(CC.keys()), 3), one_time_keyboard=True)
         self.loop.create_task(bot.sendMessage(chat_id, 'set region', reply_markup=markup))
 
     async def set_cc(self, chat_id, cc):
