@@ -34,7 +34,7 @@ class SearchSuggestParser(HTMLParser):
 
 def cache_steam_response(func):
     async def wrapper(*args, **kwargs):
-        self, url, resp_format = args[0], args[1], kwargs['resp_format']
+        self, url, resp_format = args[0], args[1], kwargs.get('resp_format')
         if resp_format is None:
             return await func(*args, **kwargs)
         cache_key = 'cached-response-{}'.format(md5(url.encode('utf-8')).hexdigest())
