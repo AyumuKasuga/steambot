@@ -233,7 +233,7 @@ class SteamBot(telepot.async.Bot):
         self.loop.create_task(self.game_search_answer(term, chat_id))
 
     async def show_lang_keyboard(self, chat_id):
-        markup = ReplyKeyboardMarkup(keyboard=group(list(LANG.keys()), 3), one_time_keyboard=True)
+        markup = ReplyKeyboardMarkup(keyboard=group(list(LANG.keys()), 2), one_time_keyboard=True)
         self.loop.create_task(bot.sendMessage(chat_id, 'set language', reply_markup=markup))
 
     async def set_lang(self, chat_id, lang):
