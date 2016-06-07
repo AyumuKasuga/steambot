@@ -311,9 +311,6 @@ class SteamBot(telepot.async.Bot):
     async def on_chat_message(self, msg):
         content_type, chat_type, chat_id = telepot.glance(msg)
         print(msg)
-        botan_token = self.config.get('botan_token')
-        if botan_token:
-            self.loop.create_task(track(botan_token, chat_id, msg, loop=self.loop))
         await self.create_or_update_user(msg.get('chat'))
         command, args = self.get_command(msg)
         if not command:
