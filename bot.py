@@ -35,18 +35,17 @@ class SteamBot(telepot.async.Bot):
 
     @cache_steam_response
     async def get_content_from_url(self, url, resp_format=None):
-        with aiohttp.ClientSession(loop=self.loop) as client:
-            resp = await client.get(url)
-            if resp.status != 200:
-                return
-            if resp_format == 'text':
-                result = await resp.text()
-            elif resp_format == 'json':
-                result = await resp.json()
-            else:
-                result = await resp.content.read()
-            resp.close()
-            return result
+        async with aiohttp.ClientSession(loop=self.loop) as client:
+            async with client.get(url) as resp:
+                if resp.status != 200:
+                    return
+                if resp_format == 'text':
+                    result = await resp.text()
+                elif resp_format == 'json':
+                    result = await resp.json()
+                else:
+                    result = await resp.content.read()
+                return result
 
     async def get_search_results(self, term, settings):
         search_url = u'https://store.steampowered.com/search/suggest?term={}&f=games&l={}&cc={}'.format(
@@ -54,9 +53,9 @@ class SteamBot(telepot.async.Bot):
             settings.get('lang'),
             settings.get('cc')
         )
-        content = self.get_content_from_url(search_url, resp_format='text')
+        content = await self.get_content_from_url(search_url, resp_format='text')
         parser = SearchSuggestParser()
-        parser.feed(await content)
+        parser.feed(content)
         return parser.result
 
     async def get_appdetails(self, appid, settings={}):
