@@ -46,7 +46,6 @@ class SteamBot(telepot.async.Bot):
                     result = await resp.json()
                 else:
                     result = await resp.content.read()
-                print(result)
                 return result
 
     async def get_search_results(self, term, settings):
