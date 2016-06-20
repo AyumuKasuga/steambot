@@ -9,6 +9,7 @@ import re
 from datetime import datetime
 import asyncio_redis
 import json
+from urllib import parse
 
 from utils import SearchSuggestParser, cache_steam_response, group
 from constants import GAME_CARD_TEMPLATE, NEWS_CARD_TEMPLATE, LANG, CC
@@ -45,11 +46,12 @@ class SteamBot(telepot.async.Bot):
                     result = await resp.json()
                 else:
                     result = await resp.content.read()
+                print(result)
                 return result
 
     async def get_search_results(self, term, settings):
         search_url = u'https://store.steampowered.com/search/suggest?term={}&f=games&l={}&cc={}'.format(
-            term,
+            parse.quote_plus(term),
             settings.get('lang'),
             settings.get('cc')
         )
