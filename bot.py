@@ -13,7 +13,6 @@ from urllib import parse
 
 from utils import SearchSuggestParser, cache_steam_response, group
 from constants import GAME_CARD_TEMPLATE, NEWS_CARD_TEMPLATE, LANG, CC
-from botan import track
 
 
 class SteamBot(telepot.async.Bot):
