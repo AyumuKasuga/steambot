@@ -1,0 +1,10 @@
+{
+    "telegram_token": "<your telegram token>",
+    "admin_id": <your chat_id for feedback>,
+    "redis": {
+        "ip": "redis",
+        "port": 6379,
+        "db": 0
+    },
+    "cache_time": 10800
+}
