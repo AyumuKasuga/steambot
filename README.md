@@ -5,7 +5,7 @@ Simple bot for searching games in steam store with inline mode.
 https://telegram.me/StoreSteamBot
 
 
-## Docker run
+## Docker
 
 https://hub.docker.com/r/ayumukasuga/steambot/ 
 
