@@ -317,7 +317,7 @@ class SteamBot(telepot.async.Bot):
         self.route(chat_id, command, args)
 
 
-with open('config.json') as f:
+with open('conf/config.json') as f:
     config = json.loads(f.read())
 
 loop = asyncio.get_event_loop()
