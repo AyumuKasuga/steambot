@@ -4,7 +4,7 @@ import asyncio
 import aiohttp
 import telepot
 import telepot.async
-from telepot.namedtuple import ReplyKeyboardMarkup
+from telepot.namedtuple import ReplyKeyboardMarkup, ReplyKeyboardHide
 import re
 from datetime import datetime
 import asyncio_redis
@@ -195,8 +195,6 @@ class SteamBot(telepot.async.Bot):
                 user['info'] = chat
                 await self.redis_conn.set(key, json.dumps(user))
 
-
-
     async def on_inline_query(self, msg):
         async def compute_answer():
             query_id, from_id, query_string = telepot.glance(msg, flavor='inline_query')
@@ -240,7 +238,7 @@ class SteamBot(telepot.async.Bot):
 
     async def set_lang(self, chat_id, lang):
         await self.save_user_settings(chat_id, {'lang': LANG.get(lang)})
-        self.loop.create_task(bot.sendMessage(chat_id, 'language saved'))
+        self.loop.create_task(bot.sendMessage(chat_id, 'language saved', reply_markup=ReplyKeyboardHide()))
 
     async def show_cc_keyboard(self, chat_id):
         markup = ReplyKeyboardMarkup(
@@ -251,7 +249,7 @@ class SteamBot(telepot.async.Bot):
 
     async def set_cc(self, chat_id, cc):
         await self.save_user_settings(chat_id, {'cc': CC.get(cc)})
-        self.loop.create_task(bot.sendMessage(chat_id, 'region saved'))
+        self.loop.create_task(bot.sendMessage(chat_id, 'region saved', reply_markup=ReplyKeyboardHide()))
 
     def route(self, chat_id, command, args=None):
         if command == '/search':
