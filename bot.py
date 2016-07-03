@@ -24,6 +24,17 @@ class SteamBot(telepot.async.Bot):
         self.cache_time = self.config.get('cache_time', 10)
         self.redis_conn = None
         self.loop.create_task(self.initialize_redis())
+        self.routes = {
+            '/search': self.search_game,
+            '/app_': self.game_card_answer,
+            '/scr_': self.screenshots_answer,
+            '/news_': self.last_news_answer,
+            '/feedback': self.feedback_answer,
+            '/settings': self.settings_answer,
+            '/lang': self.set_lang,
+            '/cc': self.set_cc,
+            '/start': self.welcome_answer
+        }
 
     async def initialize_redis(self):
         self.redis_conn = await asyncio_redis.Pool.create(
@@ -136,7 +147,9 @@ class SteamBot(telepot.async.Bot):
         msg = self.get_games_message(await self.get_search_results(term, settings))
         await self.sendMessage(chat_id, msg, parse_mode='markdown', disable_web_page_preview=True)
 
-    async def game_card_answer(self, appid, chat_id):
+    async def game_card_answer(self, chat_id, command, args):
+        appid = command.replace('/app_', '').strip()
+        self.loop.create_task(self.sendChatAction(chat_id, 'typing'))
         user_info = await self.get_user(chat_id)
         settings = user_info.get('settings')
         app_details = await self.get_appdetails(appid, settings)
@@ -146,12 +159,16 @@ class SteamBot(telepot.async.Bot):
         downloaded_file = await self.get_content_from_url(url)
         await self.sendPhoto(chat_id, photo=(photo_name, downloaded_file))
 
-    async def screenshots_answer(self, appid, chat_id):
+    async def screenshots_answer(self, chat_id, command, args):
+        appid = command.replace('/scr_', '').strip()
+        self.loop.create_task(self.sendChatAction(chat_id, 'upload_photo'))
         app_details = await self.get_appdetails(appid)
         for scr in app_details['screenshots']:
             loop.create_task(self.send_photo_from_url(scr['path_full'], 'scr-{}.jpg'.format(scr['id']), chat_id))
 
-    async def last_news_answer(self, appid, chat_id):
+    async def last_news_answer(self, chat_id, command, args):
+        appid = command.replace('/news_', '').strip()
+        self.loop.create_task(self.sendChatAction(chat_id, 'typing'))
         news_items = await self.get_news(appid)
         for item in news_items:
             msg = NEWS_CARD_TEMPLATE.format(
@@ -223,87 +240,70 @@ class SteamBot(telepot.async.Bot):
     async def on_chosen_inline_result(self, msg):
         query_id, from_id, query_string = telepot.glance(msg, flavor='chosen_inline_result')
         print('Chosen Inline Result: {} {} from_id: {}'.format(query_id, query_string, from_id))
-        self.loop.create_task(self.game_card_answer(query_id, from_id))
+        await self.game_card_answer(query_id, from_id)
 
-    def search_game(self, term, chat_id):
-        self.loop.create_task(self.sendChatAction(chat_id, 'typing'))
-        self.loop.create_task(self.game_search_answer(term, chat_id))
+    async def search_game(self, chat_id, command, args):
+        await self.sendChatAction(chat_id, 'typing')
+        await self.game_search_answer(args, chat_id)
 
-    async def show_lang_keyboard(self, chat_id):
-        markup = ReplyKeyboardMarkup(
-            keyboard=group(['/lang' + x for x in LANG.keys()], 2),
-            one_time_keyboard=True
+    async def set_lang(self, chat_id, command, args):
+        lang = args.strip() if args else None
+        if lang:
+            await self.save_user_settings(chat_id, {'lang': LANG.get(lang)})
+            await bot.sendMessage(chat_id, 'language saved', reply_markup=ReplyKeyboardHide())
+        else:
+            markup = ReplyKeyboardMarkup(
+                keyboard=group(['/lang' + x for x in LANG.keys()], 2),
+                one_time_keyboard=True
+            )
+            await bot.sendMessage(chat_id, 'set language', reply_markup=markup)
+
+    async def set_cc(self, chat_id, command, args):
+        cc = args.strip() if args else None
+        if cc:
+            await self.save_user_settings(chat_id, {'cc': CC.get(cc)})
+            await bot.sendMessage(chat_id, 'region saved', reply_markup=ReplyKeyboardHide())
+        else:
+            markup = ReplyKeyboardMarkup(
+                keyboard=group(['/cc' + x for x in CC.keys()], 3),
+                one_time_keyboard=True
+            )
+            await bot.sendMessage(chat_id, 'set region', reply_markup=markup)
+
+    async def feedback_answer(self, chat_id, command, args):
+        msg = args.replace('/feedback ', '').strip()
+        if msg:
+            await self.sendMessage(
+                self.config.get('admin_id'),
+                'feedback from: {}: {}'.format(chat_id, msg)
+            )
+            await self.sendMessage(chat_id, 'thank you for your feedback!')
+        else:
+            await self.sendMessage(chat_id, 'looks like your feedback is empty!')
+
+    async def settings_answer(self, chat_id, command, args):
+        await self.sendMessage(
+            chat_id,
+            "change region: /cc\n"
+            "change language: /lang\n"
         )
-        self.loop.create_task(bot.sendMessage(chat_id, 'set language', reply_markup=markup))
 
-    async def set_lang(self, chat_id, lang):
-        await self.save_user_settings(chat_id, {'lang': LANG.get(lang)})
-        self.loop.create_task(bot.sendMessage(chat_id, 'language saved', reply_markup=ReplyKeyboardHide()))
-
-    async def show_cc_keyboard(self, chat_id):
-        markup = ReplyKeyboardMarkup(
-            keyboard=group(['/cc' + x for x in CC.keys()], 3),
-            one_time_keyboard=True
+    async def welcome_answer(self, chat_id, command, args):
+        await self.sendMessage(
+            chat_id,
+            'Welcome! Just type / for view list of commands, also you can use this bot with inline mode.\n'
+            'For search a game just send message with game title'
         )
-        self.loop.create_task(bot.sendMessage(chat_id, 'set region', reply_markup=markup))
-
-    async def set_cc(self, chat_id, cc):
-        await self.save_user_settings(chat_id, {'cc': CC.get(cc)})
-        self.loop.create_task(bot.sendMessage(chat_id, 'region saved', reply_markup=ReplyKeyboardHide()))
 
     def route(self, chat_id, command, args=None):
-        if command == '/search':
-            self.search_game(args, chat_id)
-        elif command.find('/app_') != -1:
-            appid = command.replace('/app_', '').strip()
-            self.loop.create_task(self.sendChatAction(chat_id, 'typing'))
-            self.loop.create_task(self.game_card_answer(appid, chat_id))
-        elif command.find('/scr_') != -1:
-            appid = command.replace('/scr_', '').strip()
-            self.loop.create_task(self.sendChatAction(chat_id, 'upload_photo'))
-            self.loop.create_task(self.screenshots_answer(appid, chat_id))
-        elif command.find('/news_') != -1:
-            appid = command.replace('/news_', '').strip()
-            self.loop.create_task(self.sendChatAction(chat_id, 'typing'))
-            self.loop.create_task(self.last_news_answer(appid, chat_id))
-        elif command.find('/feedback') != -1:
-            msg = args.replace('/feedback ', '').strip()
-            if msg:
-                self.loop.create_task(self.sendMessage(
-                    self.config.get('admin_id'),
-                    'feedback from: {}: {}'.format(chat_id, msg)
-                ))
-                self.loop.create_task(self.sendMessage(chat_id, 'thank you for your feedback!'))
-            else:
-                self.loop.create_task(self.sendMessage(chat_id, 'looks like your feedback is empty!'))
-        elif command.find('/settings') != -1:
-            self.loop.create_task(
-                self.sendMessage(
-                    chat_id,
-                    "change region: /cc\n"
-                    "change language: /lang\n"
-                )
-            )
-        elif command.find('/lang') != -1:
-            lang = args.strip() if args else None
-            if lang:
-                self.loop.create_task(self.set_lang(chat_id, lang))
-            else:
-                self.loop.create_task(self.show_lang_keyboard(chat_id))
-        elif command.find('/cc') != -1:
-            cc = args.strip() if args else None
-            if cc:
-                self.loop.create_task(self.set_cc(chat_id, cc))
-            else:
-                self.loop.create_task(self.show_cc_keyboard(chat_id))
-        elif command.find('/start') != -1:
-            self.loop.create_task(
-                self.sendMessage(
-                    chat_id,
-                    'Welcome! Just type / for view list of commands, also you can use this bot with inline mode.\n'
-                    'For search a game just send message with game title'
-                )
-            )
+        func = None
+        for cmd, fnc in self.routes.items():
+            if command.find(cmd) != -1:
+                func = fnc
+                break
+
+        if func:
+            self.loop.create_task(func(chat_id, command, args))
 
     async def on_chat_message(self, msg):
         content_type, chat_type, chat_id = telepot.glance(msg)
