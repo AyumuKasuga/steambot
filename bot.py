@@ -1,25 +1,26 @@
 # coding: utf-8
 
 import asyncio
-import aiohttp
-import telepot
-import telepot.async
-from telepot.namedtuple import ReplyKeyboardMarkup, ReplyKeyboardHide
+import json
 import re
 from datetime import datetime
-import asyncio_redis
-import json
 from urllib import parse
 
-from utils import SearchSuggestParser, cache_steam_response, group
+import aiohttp
+import asyncio_redis
+import telepot
+import telepot.aio
+from telepot.namedtuple import ReplyKeyboardMarkup, ReplyKeyboardRemove
+
 from constants import GAME_CARD_TEMPLATE, NEWS_CARD_TEMPLATE, LANG, CC
+from utils import SearchSuggestParser, cache_steam_response, group
 
 
-class SteamBot(telepot.async.Bot):
+class SteamBot(telepot.aio.Bot):
 
     def __init__(self, *args, config=None, **kwargs):
         super(SteamBot, self).__init__(*args, **kwargs)
-        self._answerer = telepot.async.helper.Answerer(self)
+        self._answerer = telepot.aio.helper.Answerer(self)
         self.config = config
         self.cache_time = self.config.get('cache_time', 10)
         self.redis_conn = None
@@ -250,7 +251,7 @@ class SteamBot(telepot.async.Bot):
         lang = args.strip() if args else None
         if lang:
             await self.save_user_settings(chat_id, {'lang': LANG.get(lang)})
-            await bot.sendMessage(chat_id, 'language saved', reply_markup=ReplyKeyboardHide())
+            await bot.sendMessage(chat_id, 'language saved', reply_markup=ReplyKeyboardRemove())
         else:
             markup = ReplyKeyboardMarkup(
                 keyboard=group(['/lang' + x for x in LANG.keys()], 2),
@@ -262,7 +263,7 @@ class SteamBot(telepot.async.Bot):
         cc = args.strip() if args else None
         if cc:
             await self.save_user_settings(chat_id, {'cc': CC.get(cc)})
-            await bot.sendMessage(chat_id, 'region saved', reply_markup=ReplyKeyboardHide())
+            await bot.sendMessage(chat_id, 'region saved', reply_markup=ReplyKeyboardRemove())
         else:
             markup = ReplyKeyboardMarkup(
                 keyboard=group(['/cc' + x for x in CC.keys()], 3),
