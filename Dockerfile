@@ -20,4 +20,4 @@ RUN pip3 install --no-cache-dir -r requirements.txt
 
 COPY *.py /steambot/
 
-CMD python -u bot.py
+CMD python3 -u bot.py
