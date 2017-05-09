@@ -1,3 +1,2 @@
-aiohttp==2.0.2
 asyncio-redis==0.14.2
-https://github.com/AyumuKasuga/telepot/archive/master.zip
+telepot==11.0
