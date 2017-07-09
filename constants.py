@@ -27,7 +27,8 @@ _{author}_
 LANG = {
     '\U0001f1fa\U0001f1f8 English': 'english',
     '\U0001f1f7\U0001f1fa Русский': 'russian',
-    '\U0001f1ee\U0001f1f9 Italiano': 'italian'
+    '\U0001f1ee\U0001f1f9 Italiano': 'italian',
+
 }
 
 CC = {
@@ -36,5 +37,6 @@ CC = {
     '\U0001f1e9\U0001f1ea': 'DE',
     '\U0001f1f7\U0001f1fa': 'RU',
     '\U0001f1ee\U0001f1f9': 'IT',
-    '\U0001f1ee\U0001f1f3': 'IN'
+    '\U0001f1ee\U0001f1f3': 'IN',
+    '\U0001F1E7\U0001F1F7': 'BR'
 }
