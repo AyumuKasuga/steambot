@@ -16,7 +16,7 @@ from constants import GAME_CARD_TEMPLATE, NEWS_CARD_TEMPLATE, LANG, CC
 from utils import SearchSuggestParser, cache_steam_response, group
 
 
-class SteamBot(telepot.aio.Bot):
+class SteamBot(telepot.aio.Bot, telepot.helper.AnswererMixin):
 
     def __init__(self, *args, config=None, **kwargs):
         super(SteamBot, self).__init__(*args, **kwargs)
@@ -93,7 +93,7 @@ class SteamBot(telepot.aio.Bot):
             for entity in msg['entities']:
                 if entity['type'] == 'bot_command':
                     offset, length = entity['offset'], entity['length']
-                    return msg['text'][offset:length], msg['text'][offset+length:].strip()
+                    return msg['text'][offset:length], msg['text'][offset + length:].strip()
         return None, None
 
     @staticmethod
@@ -128,12 +128,17 @@ class SteamBot(telepot.aio.Bot):
                 appdetails['metacritic']['score'],
                 appdetails['metacritic']['url']
             ) if 'metacritic' in appdetails else '',
-            platforms=', '.join([x[0] for x in appdetails['platforms'].items() if x[1]]),
-            genres=', '.join([x['description'] for x in appdetails['genres']]) if 'genres' in appdetails else '',
-            publishers=', '.join(appdetails['publishers']) if 'publishers' in appdetails else '',
-            price='{} {}'.format(appdetails['price_overview']['final']/100.0, appdetails['price_overview']['currency']) if 'price_overview' in appdetails else '',
+            platforms=', '.join(
+                [x[0] for x in appdetails['platforms'].items() if x[1]]),
+            genres=', '.join(
+                [x['description'] for x in appdetails['genres']]) if 'genres' in appdetails else '',
+            publishers=', '.join(
+                appdetails['publishers']) if 'publishers' in appdetails else '',
+            price='{} {}'.format(appdetails['price_overview']['final'] / 100.0,
+                                 appdetails['price_overview']['currency']) if 'price_overview' in appdetails else '',
             recommendations=appdetails['recommendations']['total'] if 'recommendations' in appdetails else '',
-            screenshotscount=len(appdetails['screenshots']) if 'screenshots' in appdetails else '0',
+            screenshotscount=len(
+                appdetails['screenshots']) if 'screenshots' in appdetails else '0',
             about_the_game=self.clean_html(appdetails['about_the_game'])[:500]
         )
 
@@ -165,7 +170,8 @@ class SteamBot(telepot.aio.Bot):
         self.loop.create_task(self.sendChatAction(chat_id, 'upload_photo'))
         app_details = await self.get_appdetails(appid)
         for scr in app_details['screenshots']:
-            loop.create_task(self.send_photo_from_url(scr['path_full'], 'scr-{}.jpg'.format(scr['id']), chat_id))
+            loop.create_task(self.send_photo_from_url(
+                scr['path_full'], 'scr-{}.jpg'.format(scr['id']), chat_id))
 
     async def last_news_answer(self, chat_id, command, args):
         appid = command.replace('/news_', '').strip()
@@ -175,12 +181,15 @@ class SteamBot(telepot.aio.Bot):
             msg = NEWS_CARD_TEMPLATE.format(
                 title=item['title'],
                 url=item['url'],
-                pub_date=datetime.fromtimestamp(int(item['date'])).strftime("%B %d, %Y"),
+                pub_date=datetime.fromtimestamp(
+                    int(item['date'])).strftime("%B %d, %Y"),
                 feedlabel=item['feedlabel'],
-                contents=self.clean_markdown(self.clean_html(item['contents'])).replace('\n', '').replace('  ', '')[:300],
+                contents=self.clean_markdown(self.clean_html(item['contents'])).replace(
+                    '\n', '').replace('  ', '')[:300],
                 author=item['author']
             )
-            loop.create_task(self.sendMessage(chat_id, msg, parse_mode='markdown'))
+            loop.create_task(self.sendMessage(
+                chat_id, msg, parse_mode='markdown'))
 
     def get_user_key(self, user_id):
         return 'user-{}'.format(user_id)
@@ -205,7 +214,8 @@ class SteamBot(telepot.aio.Bot):
                 'lang': 'english',
                 'cc': 'US'
             }
-            new_user_serialized = json.dumps({'info': new_user, 'settings': default_settings})
+            new_user_serialized = json.dumps(
+                {'info': new_user, 'settings': default_settings})
             await self.redis_conn.set(key, new_user_serialized)
         else:
             user = json.loads(user)
@@ -215,7 +225,8 @@ class SteamBot(telepot.aio.Bot):
 
     async def on_inline_query(self, msg):
         async def compute_answer():
-            query_id, from_id, query_string = telepot.glance(msg, flavor='inline_query')
+            query_id, from_id, query_string = telepot.glance(
+                msg, flavor='inline_query')
             print('inline query: {} from_id: {}'.format(query_string, from_id))
             user_info = await self.get_user(from_id)
             settings = user_info.get('settings')
@@ -235,12 +246,14 @@ class SteamBot(telepot.aio.Bot):
                     'description': res['price'],
                     'thumb_url': res['image']
                 })
-            return {'results': articles, 'switch_pm_text': 'Back to Bot'}
+            return {'results': articles}
         self._answerer.answer(msg, compute_answer)
 
     async def on_chosen_inline_result(self, msg):
-        query_id, from_id, query_string = telepot.glance(msg, flavor='chosen_inline_result')
-        print('Chosen Inline Result: {} {} from_id: {}'.format(query_id, query_string, from_id))
+        query_id, from_id, query_string = telepot.glance(
+            msg, flavor='chosen_inline_result')
+        print('Chosen Inline Result: {} {} from_id: {}'.format(
+            query_id, query_string, from_id))
         await self.game_card_answer(query_id, from_id)
 
     async def search_game(self, chat_id, command, args):

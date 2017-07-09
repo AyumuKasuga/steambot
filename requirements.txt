@@ -1,2 +1,2 @@
 asyncio-redis==0.14.2
-telepot==11.0
+telepot==12.1
